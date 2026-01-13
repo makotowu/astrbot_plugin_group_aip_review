@@ -1,0 +1,316 @@
+{
+  "baidu_audit": {
+    "description": "百度云审核API配置",
+    "type": "object",
+    "items": {
+      "api_key": {
+        "description": "百度云API Key",
+        "type": "string",
+        "hint": "必填项，从百度云控制台获取"
+      },
+      "secret_key": {
+        "description": "百度云Secret Key", 
+        "type": "string",
+        "hint": "必填项，从百度云控制台获取"
+      },
+      "strategy_id": {
+        "description": "自定义审核策略ID",
+        "type": "string", 
+        "hint": "可选，在百度云后台设置的自定义策略ID"
+      },
+      "access_token_expire": {
+        "description": "AccessToken有效期（秒）",
+        "type": "int",
+        "default": 86400,
+        "hint": "默认24小时，建议保持默认值"
+      }
+    }
+  },
+  "disposal": {
+    "description": "审核处置配置",
+    "type": "object",
+    "items": {
+      "default": {
+        "description": "默认全局配置",
+        "type": "object",
+        "items": {
+          "notify_group_id": {
+            "description": "默认通知群ID",
+            "type": "string",
+            "hint": "所有未自定义配置的群共用此通知群"
+          },
+          "bot_owner_id": {
+            "description": "Bot主人ID",
+            "type": "string", 
+            "hint": "审核失败时通知Bot主人"
+          },
+          "single_user_violation_threshold": {
+            "description": "单人短时间违规次数阈值",
+            "type": "int",
+            "default": 3,
+            "hint": "默认3次触发禁言，设置为0表示不启用单人禁言功能"
+          },
+          "group_violation_threshold": {
+            "description": "群内短时间违规次数阈值", 
+            "type": "int",
+            "default": 5,
+            "hint": "默认5次触发全员禁言，设置为0表示不启用全员禁言功能"
+          },
+          "time_window": {
+            "description": "统计时间窗口（秒）",
+            "type": "int", 
+            "default": 300,
+            "hint": "默认5分钟=300秒"
+          },
+          "mute_duration": {
+            "description": "单人禁言时长（秒）",
+            "type": "int",
+            "default": 86400,
+            "hint": "默认1天=86400秒"
+          },
+          "kick_user": {
+            "description": "是否启用踢人",
+            "type": "bool",
+            "default": false,
+            "hint": "是否在达到阈值后踢出用户"
+          },
+          "kick_user_threshold": {
+            "description": "踢人阈值",
+            "type": "int", 
+            "default": 5,
+            "hint": "用户发送几条违规消息后执行踢群，设置为0表示不启用踢人功能"
+          },
+          "is_kick_user_and_block": {
+            "description": "是否踢出并拉黑用户",
+            "type": "bool",
+            "default": false,
+            "hint": "是否在踢出用户的同时加入黑名单"
+          }
+        }
+      },
+      "group_custom": {
+        "description": "群级别自定义配置",
+        "type": "template_list",
+        "hint": "为不同的群配置不同的审核参数。可以在 WebUI 上快速添加和编辑群配置。",
+        "templates": {
+          "default_group_config": {
+            "name": "默认群配置",
+            "hint": "适用于大多数群的标准配置",
+            "items": {
+              "group_id": {
+                "description": "群号",
+                "type": "string",
+                "hint": "要配置的群号（纯数字）"
+              },
+              "rule_id": {
+                "description": "规则ID",
+                "type": "string",
+                "default": "default",
+                "hint": "规则标识，用于区分不同的审核规则"
+              },
+              "notify_group_id": {
+                "description": "通知群ID",
+                "type": "string",
+                "hint": "违规内容通知群ID"
+              },
+              "single_user_violation_threshold": {
+                "description": "单人违规阈值",
+                "type": "int",
+                "default": 3,
+                "hint": "单人短时间违规次数阈值，默认3次触发禁言"
+              },
+              "group_violation_threshold": {
+                "description": "群违规阈值",
+                "type": "int",
+                "default": 5,
+                "hint": "群内短时间违规次数阈值，默认5次触发全员禁言"
+              },
+              "time_window": {
+                "description": "时间窗口（秒）",
+                "type": "int",
+                "default": 300,
+                "hint": "统计时间窗口，默认5分钟=300秒"
+              },
+              "mute_duration": {
+                "description": "禁言时长（秒）",
+                "type": "int",
+                "default": 86400,
+                "hint": "单人禁言时长，默认1天=86400秒"
+              },
+              "kick_user": {
+                "description": "是否启用踢人",
+                "type": "bool",
+                "default": false,
+                "hint": "是否在达到阈值后踢出用户"
+              },
+              "kick_user_threshold": {
+                "description": "踢人阈值",
+                "type": "int",
+                "default": 5,
+                "hint": "用户发送几条违规消息后执行踢群"
+              },
+              "is_kick_user_and_block": {
+                "description": "是否踢出并拉黑用户",
+                "type": "bool",
+                "default": false,
+                "hint": "是否在踢出用户的同时加入黑名单"
+              }
+            }
+          },
+          "strict_config": {
+            "name": "严格配置",
+            "hint": "适用于需要严格管理的群",
+            "items": {
+              "group_id": {
+                "description": "群号",
+                "type": "string",
+                "hint": "要配置的群号（纯数字）"
+              },
+              "rule_id": {
+                "description": "规则ID",
+                "type": "string",
+                "default": "strict",
+                "hint": "规则标识，用于区分不同的审核规则"
+              },
+              "notify_group_id": {
+                "description": "通知群ID",
+                "type": "string",
+                "hint": "违规内容通知群ID"
+              },
+              "single_user_violation_threshold": {
+                "description": "单人违规阈值",
+                "type": "int",
+                "default": 2,
+                "hint": "单人短时间违规次数阈值，默认2次触发禁言"
+              },
+              "group_violation_threshold": {
+                "description": "群违规阈值",
+                "type": "int",
+                "default": 4,
+                "hint": "群内短时间违规次数阈值，默认4次触发全员禁言"
+              },
+              "time_window": {
+                "description": "时间窗口（秒）",
+                "type": "int",
+                "default": 600,
+                "hint": "统计时间窗口，默认10分钟=600秒"
+              },
+              "mute_duration": {
+                "description": "禁言时长（秒）",
+                "type": "int",
+                "default": 43200,
+                "hint": "单人禁言时长，默认12小时=43200秒"
+              },
+              "kick_user": {
+                "description": "是否启用踢人",
+                "type": "bool",
+                "default": true,
+                "hint": "是否在达到阈值后踢出用户"
+              },
+              "kick_user_threshold": {
+                "description": "踢人阈值",
+                "type": "int",
+                "default": 3,
+                "hint": "用户发送几条违规消息后执行踢群"
+              },
+              "is_kick_user_and_block": {
+                "description": "是否踢出并拉黑用户",
+                "type": "bool",
+                "default": true,
+                "hint": "是否在踢出用户的同时加入黑名单"
+              }
+            }
+          },
+          "lenient_config": {
+            "name": "宽松配置",
+            "hint": "适用于管理宽松的群",
+            "items": {
+              "group_id": {
+                "description": "群号",
+                "type": "string",
+                "hint": "要配置的群号（纯数字）"
+              },
+              "rule_id": {
+                "description": "规则ID",
+                "type": "string",
+                "default": "lenient",
+                "hint": "规则标识，用于区分不同的审核规则"
+              },
+              "notify_group_id": {
+                "description": "通知群ID",
+                "type": "string",
+                "hint": "违规内容通知群ID"
+              },
+              "single_user_violation_threshold": {
+                "description": "单人违规阈值",
+                "type": "int",
+                "default": 5,
+                "hint": "单人短时间违规次数阈值，默认5次触发禁言，设置为0表示不启用单人禁言功能"
+              },
+              "group_violation_threshold": {
+                "description": "群违规阈值",
+                "type": "int",
+                "default": 10,
+                "hint": "群内短时间违规次数阈值，默认10次触发全员禁言，设置为0表示不启用全员禁言功能"
+              },
+              "time_window": {
+                "description": "时间窗口（秒）",
+                "type": "int",
+                "default": 600,
+                "hint": "统计时间窗口，默认10分钟=600秒"
+              },
+              "mute_duration": {
+                "description": "禁言时长（秒）",
+                "type": "int",
+                "default": 3600,
+                "hint": "单人禁言时长，默认1小时=3600秒"
+              },
+              "kick_user": {
+                "description": "是否启用踢人",
+                "type": "bool",
+                "default": false,
+                "hint": "是否在达到阈值后踢出用户"
+              },
+              "kick_user_threshold": {
+                "description": "踢人阈值",
+                "type": "int",
+                "default": 10,
+                "hint": "用户发送几条违规消息后执行踢群，设置为0表示不启用踢人功能。"
+              },
+              "is_kick_user_and_block": {
+                "description": "是否踢出并拉黑用户",
+                "type": "bool",
+                "default": false,
+                "hint": "是否在踢出用户的同时加入黑名单"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "enabled_groups": {
+    "description": "启用插件的群号列表",
+    "type": "list",
+    "default": [],
+    "hint": "填入需要开启审核的群号（纯数字）。如果留空（默认），则不对任何群进行审核。"
+  },
+  "enable_text_censor": {
+    "description": "是否启用文本审核",
+    "type": "bool",
+    "default": true,
+    "hint": "启用后将对文本消息进行审核"
+  },
+  "enable_image_censor": {
+    "description": "是否启用图片审核", 
+    "type": "bool",
+    "default": true,
+    "hint": "启用后将对图片消息进行审核"
+  },
+  "log_level": {
+    "description": "日志级别",
+    "type": "string",
+    "default": "INFO",
+    "hint": "DEBUG/INFO/WARNING/ERROR"
+  }
+}
