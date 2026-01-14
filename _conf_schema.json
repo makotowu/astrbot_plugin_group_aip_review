@@ -26,6 +26,30 @@
       }
     }
   },
+  "enabled_groups": {
+    "description": "启用插件的群号列表",
+    "type": "list",
+    "default": [],
+    "hint": "填入需要开启审核的群号（纯数字）。如果留空（默认），则不对任何群进行审核。"
+  },
+  "enable_text_censor": {
+    "description": "是否启用文本审核",
+    "type": "bool",
+    "default": true,
+    "hint": "启用后将对文本消息进行审核"
+  },
+  "enable_image_censor": {
+    "description": "是否启用图片审核", 
+    "type": "bool",
+    "default": true,
+    "hint": "启用后将对图片消息进行审核"
+  },
+  "log_level": {
+    "description": "日志级别",
+    "type": "string",
+    "default": "INFO",
+    "hint": "DEBUG/INFO/WARNING/ERROR"
+  },
   "disposal": {
     "description": "审核处置配置",
     "type": "object",
@@ -102,16 +126,16 @@
                 "type": "string",
                 "hint": "要配置的群号（纯数字）"
               },
+              "notify_group_id": {
+                "description": "通知群号",
+                "type": "string",
+                "hint": "违规内容通知群号"
+              },
               "rule_id": {
                 "description": "审核策略ID",
                 "type": "string",
                 "default": "default",
                 "hint": "群聊审核策略ID，请在百度云内容审核后台创建并设置规则"
-              },
-              "notify_group_id": {
-                "description": "通知群号",
-                "type": "string",
-                "hint": "违规内容通知群号"
               },
               "single_user_violation_threshold": {
                 "description": "单人违规阈值",
@@ -166,16 +190,16 @@
                 "type": "string",
                 "hint": "要配置的群号（纯数字）"
               },
+              "notify_group_id": {
+                "description": "通知群号",
+                "type": "string",
+                "hint": "违规内容通知群号"
+              },
               "rule_id": {
                 "description": "审核策略ID",
                 "type": "string",
                 "default": "default",
                 "hint": "群聊审核策略ID，请在百度云内容审核后台创建并设置规则"
-              },
-              "notify_group_id": {
-                "description": "通知群号",
-                "type": "string",
-                "hint": "违规内容通知群号"
               },
               "single_user_violation_threshold": {
                 "description": "单人违规阈值",
@@ -230,16 +254,16 @@
                 "type": "string",
                 "hint": "要配置的群号（纯数字）"
               },
+              "notify_group_id": {
+                "description": "通知群号",
+                "type": "string",
+                "hint": "违规内容通知群号"
+              },
               "rule_id": {
                 "description": "审核策略ID",
                 "type": "string",
                 "default": "default",
                 "hint": "群聊审核策略ID，请在百度云内容审核后台创建并设置规则"
-              },
-              "notify_group_id": {
-                "description": "通知群号",
-                "type": "string",
-                "hint": "违规内容通知群号"
               },
               "single_user_violation_threshold": {
                 "description": "单人违规阈值",
@@ -288,29 +312,5 @@
         }
       }
     }
-  },
-  "enabled_groups": {
-    "description": "启用插件的群号列表",
-    "type": "list",
-    "default": [],
-    "hint": "填入需要开启审核的群号（纯数字）。如果留空（默认），则不对任何群进行审核。"
-  },
-  "enable_text_censor": {
-    "description": "是否启用文本审核",
-    "type": "bool",
-    "default": true,
-    "hint": "启用后将对文本消息进行审核"
-  },
-  "enable_image_censor": {
-    "description": "是否启用图片审核", 
-    "type": "bool",
-    "default": true,
-    "hint": "启用后将对图片消息进行审核"
-  },
-  "log_level": {
-    "description": "日志级别",
-    "type": "string",
-    "default": "INFO",
-    "hint": "DEBUG/INFO/WARNING/ERROR"
   }
 }
