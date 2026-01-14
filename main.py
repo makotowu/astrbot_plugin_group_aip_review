@@ -3,11 +3,27 @@ import time
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import Image, Plain
 from astrbot.api.star import Context, Star, register
+
+# 检查并导入第三方依赖
+try:
+    from aip import AipContentCensor
+    BAIDU_AIP_AVAILABLE = True
+except ImportError:
+    BAIDU_AIP_AVAILABLE = False
+    AipContentCensor = None
+
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+    httpx = None
 
 
 class AuditData:
@@ -37,20 +53,37 @@ class BaiduAuditAPI:
         self.api_key = api_key
         self.secret_key = secret_key
         self.strategy_id = strategy_id
+        self._http_client = None
         
         # 初始化百度内容审核客户端
+        if not BAIDU_AIP_AVAILABLE:
+            logger.error("未安装baidu-aip包，请运行: pip install baidu-aip")
+            self.client = None
+            return
+            
         try:
-            from aip import AipContentCensor
             # 百度SDK需要三个参数：appId, apiKey, secretKey
             # 我们没有appId，所以使用空字符串
             self.client = AipContentCensor("", api_key, secret_key)
             logger.info("百度内容审核客户端初始化成功")
-        except ImportError:
-            logger.error("未安装baidu-aip包，请运行: pip install baidu-aip")
-            self.client = None
         except Exception as e:
             logger.error(f"百度内容审核客户端初始化失败: {e}")
             self.client = None
+    
+    async def _get_http_client(self):
+        """获取或创建HTTP客户端"""
+        if self._http_client is None and HTTPX_AVAILABLE:
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0),
+                limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+            )
+        return self._http_client
+    
+    async def close(self):
+        """关闭HTTP客户端"""
+        if self._http_client:
+            await self._http_client.aclose()
+            self._http_client = None
     
     async def text_censor(self, text: str) -> Dict:
         """文本内容审核"""
@@ -59,9 +92,6 @@ class BaiduAuditAPI:
         
         try:
             # 由于百度SDK是同步的，使用线程池执行异步操作
-            import asyncio
-            from concurrent.futures import ThreadPoolExecutor
-            
             def sync_text_censor():
                 return self.client.textCensorUserDefined(text)
             
@@ -79,20 +109,20 @@ class BaiduAuditAPI:
         if not self.client:
             return {"error": "百度内容审核客户端未初始化"}
         
+        if not HTTPX_AVAILABLE:
+            return {"error": "未安装httpx包，请运行: pip install httpx"}
+        
         try:
             # 下载图片
-            import asyncio
-            from concurrent.futures import ThreadPoolExecutor
-            import httpx
+            http_client = await self._get_http_client()
+            if not http_client:
+                return {"error": "HTTP客户端初始化失败"}
             
-            async def download_image():
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(image_url)
-                    if response.status_code != 200:
-                        raise Exception("图片下载失败")
-                    return response.content
+            response = await http_client.get(image_url)
+            if response.status_code != 200:
+                raise Exception(f"图片下载失败，状态码: {response.status_code}")
             
-            image_data = await download_image()
+            image_data = response.content
             
             # 使用百度SDK进行图片审核，由于百度SDK是同步的，使用线程池执行异步操作
             def sync_image_censor():
@@ -247,6 +277,12 @@ class GroupAipReviewPlugin(Star):
         self.baidu_api = BaiduAuditAPI(api_key, secret_key, strategy_id)
         logger.info("百度内容审核API初始化完成")
     
+    async def terminate(self):
+        """插件卸载时关闭HTTP客户端"""
+        if self.baidu_api:
+            await self.baidu_api.close()
+            logger.info("百度API HTTP客户端已关闭")
+    
     def get_group_config(self, group_id: str) -> Dict:
         """获取群组配置"""
         disposal_config = self.config.get("disposal", {})
@@ -291,7 +327,7 @@ class GroupAipReviewPlugin(Star):
                         # 在消息中添加群名称和用户昵称
                         notification_with_info = f"{message}\n群：{group_name}（{group_id}）\n用户：{user_nickname}（{user_id}）"
                         await client.send_group_msg(
-                            group_id=int(notify_group_id),
+                            group_id=notify_group_id,
                             message=notification_with_info
                         )
                         logger.info(f"发送通知到群 {notify_group_id}: {notification_with_info}")
@@ -311,7 +347,7 @@ class GroupAipReviewPlugin(Star):
                 client = platform.get_client()
                 if hasattr(client, 'send_private_msg'):
                     await client.send_private_msg(
-                        user_id=int(user_id),
+                        user_id=user_id,
                         message=message
                     )
                     logger.info(f"发送私聊消息给用户 {user_id}: {message}")
@@ -384,7 +420,7 @@ class GroupAipReviewPlugin(Star):
         """撤回消息"""
         try:
             message_id = event.message_obj.message_id
-            await event.bot.delete_msg(message_id=int(message_id))
+            await event.bot.delete_msg(message_id=message_id)
             logger.info(f"撤回消息成功: {message_id}")
         except Exception as e:
             logger.error(f"撤回消息失败: {e}")
@@ -431,8 +467,8 @@ class GroupAipReviewPlugin(Star):
         """禁言用户"""
         try:
             await event.bot.set_group_ban(
-                group_id=int(event.get_group_id()),
-                user_id=int(event.get_sender_id()),
+                group_id=event.get_group_id(),
+                user_id=event.get_sender_id(),
                 duration=duration
             )
             logger.info(f"禁言用户成功: {event.get_sender_id()} {duration}秒")
@@ -445,8 +481,8 @@ class GroupAipReviewPlugin(Star):
             group_id = audit_data.group_id
             
             await audit_data.event.bot.set_group_kick(
-                group_id=int(group_id),
-                user_id=int(audit_data.user_id),
+                group_id=group_id,
+                user_id=audit_data.user_id,
                 reject_add_request=block
             )
             logger.info(f"踢出用户成功: {audit_data.user_id}, 是否拉黑: {block}")
@@ -463,7 +499,7 @@ class GroupAipReviewPlugin(Star):
         """全员禁言"""
         try:
             await event.bot.set_group_whole_ban(
-                group_id=int(event.get_group_id()),
+                group_id=event.get_group_id(),
                 enable=True
             )
             logger.info(f"开启全员禁言成功: 群 {event.get_group_id()}")
