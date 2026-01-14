@@ -9,6 +9,26 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import Image, Plain
 from astrbot.api.star import Context, Star, register
 
+
+class AuditData:
+    """审核数据封装类，用于传递审核相关的信息"""
+    
+    def __init__(self, event: AstrMessageEvent, audit_type: str, result: str, reason: str, 
+                 group_name: str, user_nickname: str, user_id: str):
+        self.event = event
+        self.audit_type = audit_type
+        self.result = result
+        self.reason = reason
+        self.group_name = group_name
+        self.user_nickname = user_nickname
+        self.user_id = user_id
+        
+    @property
+    def group_id(self) -> Optional[str]:
+        """从事件中获取群ID"""
+        return self.event.get_group_id() if self.event else None
+
+
 # 百度内容审核API集成类
 class BaiduAuditAPI:
     """百度内容审核API封装类（使用官方SDK）"""
@@ -252,7 +272,7 @@ class GroupAipReviewPlugin(Star):
         
         return group_config
     
-    async def _send_notification(self, group_id: str, message: str):
+    async def _send_notification(self, group_id: str, message: str, group_name: str = None, user_nickname: str = None, user_id: str = None):
         """发送通知消息"""
         try:
             group_config = self.get_group_config(group_id)
@@ -268,13 +288,13 @@ class GroupAipReviewPlugin(Star):
                 for platform in platforms:
                     client = platform.get_client()
                     if hasattr(client, 'send_group_msg'):
-                        # 在消息中添加规则ID信息
-                        notification_with_rule = f"{message}\n规则ID: {rule_id}"
+                        # 在消息中添加群名称和用户昵称
+                        notification_with_info = f"{message}\n群：{group_name}（{group_id}）\n用户：{user_nickname}（{user_id}）\n规则ID：{rule_id}"
                         await client.send_group_msg(
                             group_id=int(notify_group_id),
-                            message=notification_with_rule
+                            message=notification_with_info
                         )
-                        logger.info(f"发送通知到群 {notify_group_id}: {notification_with_rule}")
+                        logger.info(f"发送通知到群 {notify_group_id}: {notification_with_info}")
                         break
         except Exception as e:
             logger.error(f"发送通知失败: {e}")
@@ -299,60 +319,57 @@ class GroupAipReviewPlugin(Star):
         except Exception as e:
             logger.error(f"发送私聊消息失败: {e}")
     
-    async def _handle_audit_result(self, event: AstrMessageEvent, audit_type: str, result: str, reason: str):
+    async def _handle_audit_result(self, audit_data: AuditData):
         """处理审核结果"""
-        group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        group_id = audit_data.group_id
         
         if not group_id:  # 私聊消息
             return
         
         group_config = self.get_group_config(group_id)
         
-        if result == "合规":
+        if audit_data.result == "合规":
             # 合规，不执行任何操作
-            logger.debug(f"消息审核通过: {audit_type} - 用户 {user_id} 在群 {group_id}")
+            logger.debug(f"消息审核通过: {audit_data.audit_type} - 用户 {audit_data.user_id} 在群 {group_id}")
             
-        elif result == "不合规":
+        elif audit_data.result == "不合规":
             # 不合规，立即撤回消息并记录违规
-            await self._handle_non_compliant(event, audit_type, reason, group_config)
+            await self._handle_non_compliant(audit_data, group_config)
             
-        elif result == "疑似":
+        elif audit_data.result == "疑似":
             # 疑似违规，发送通知
-            await self._handle_suspicious(event, audit_type, reason, group_config)
+            await self._handle_suspicious(audit_data, group_config)
             
-        elif result == "审核失败":
+        elif audit_data.result == "审核失败":
             # 审核失败，通知Bot主人
-            await self._handle_audit_failure(event, audit_type, reason, group_config)
+            await self._handle_audit_failure(audit_data.event, audit_data.audit_type, audit_data.reason, group_config)
     
-    async def _handle_non_compliant(self, event: AstrMessageEvent, audit_type: str, reason: str, group_config: Dict):
+    async def _handle_non_compliant(self, audit_data: AuditData, group_config: Dict):
         """处理不合规内容"""
-        group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        group_id = audit_data.group_id
         
         # 记录违规
-        self.violation_manager.add_violation(group_id, user_id, audit_type)
+        self.violation_manager.add_violation(group_id, audit_data.user_id, audit_data.audit_type)
         
         # 撤回消息
-        await self._recall_message(event)
+        await self._recall_message(audit_data.event)
         
         # 发送通知
         rule_id = group_config.get("rule_id", "default")
-        notification_msg = f"⚠️ 检测到违规内容\n类型: {audit_type}\n用户: {user_id}\n原因: {reason}\n规则ID: {rule_id}"
-        await self._send_notification(group_id, notification_msg)
+        notification_msg = f"⚠️ 检测到违规内容\n类型: {audit_data.audit_type}\n用户: {audit_data.user_id}\n原因: {audit_data.reason}\n规则ID: {rule_id}"
+        await self._send_notification(group_id, notification_msg, audit_data.group_name, audit_data.user_nickname, audit_data.user_id)
         
         # 检查是否需要禁言或踢人
-        await self._check_and_apply_punishment(event, group_config)
+        await self._check_and_apply_punishment(audit_data, group_config)
     
-    async def _handle_suspicious(self, event: AstrMessageEvent, audit_type: str, reason: str, group_config: Dict):
+    async def _handle_suspicious(self, audit_data: AuditData, group_config: Dict):
         """处理疑似违规内容"""
-        group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        group_id = audit_data.group_id
         rule_id = group_config.get("rule_id", "default")
         
         # 发送通知给管理员核实
-        notification_msg = f"❓ 检测到疑似违规内容\n类型: {audit_type}\n用户: {user_id}\n原因: {reason}\n规则ID: {rule_id}\n请管理员核实处理"
-        await self._send_notification(group_id, notification_msg)
+        notification_msg = f"❓ 检测到疑似违规内容\n类型: {audit_data.audit_type}\n用户: {audit_data.user_id}\n原因: {audit_data.reason}\n规则ID: {rule_id}\n请管理员核实处理"
+        await self._send_notification(group_id, notification_msg, audit_data.group_name, audit_data.user_nickname, audit_data.user_id)
     
     async def _handle_audit_failure(self, event: AstrMessageEvent, audit_type: str, reason: str, group_config: Dict):
         """处理审核失败"""
@@ -372,31 +389,30 @@ class GroupAipReviewPlugin(Star):
         except Exception as e:
             logger.error(f"撤回消息失败: {e}")
     
-    async def _check_and_apply_punishment(self, event: AstrMessageEvent, group_config: Dict):
+    async def _check_and_apply_punishment(self, audit_data: AuditData, group_config: Dict):
         """检查并应用惩罚措施"""
-        group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        group_id = audit_data.group_id
         
         time_window = group_config.get("time_window", 300)
         
         # 检查单人违规次数
-        user_violations = self.violation_manager.get_user_violation_count(group_id, user_id, time_window)
+        user_violations = self.violation_manager.get_user_violation_count(group_id, audit_data.user_id, time_window)
         single_threshold = group_config.get("single_user_violation_threshold", 3)
         
         if single_threshold > 0 and user_violations >= single_threshold:
             # 禁言用户
             mute_duration = group_config.get("mute_duration", 86400)
             rule_id = group_config.get("rule_id", "default")
-            await self._mute_user(event, mute_duration)
+            await self._mute_user(audit_data.event, mute_duration)
             
             # 发送通知到通知群
-            notification_msg = f"⚠️ 用户违规禁言通知\n群ID: {group_id}\n用户ID: {user_id}\n违规次数: {user_violations}次\n已禁言 {mute_duration // 3600} 小时，请管理员关注。\n规则ID: {rule_id}"
-            await self._send_notification(group_id, notification_msg)
+            notification_msg = f"⚠️ 用户违规禁言通知\n群ID: {group_id}\n用户ID: {audit_data.user_id}\n违规次数: {user_violations}次\n已禁言 {mute_duration // 3600} 小时，请管理员关注。\n规则ID: {rule_id}"
+            await self._send_notification(group_id, notification_msg, audit_data.group_name, audit_data.user_nickname, audit_data.user_id)
             
             # 检查是否需要踢人
             kick_threshold = group_config.get("kick_user_threshold", 5)
             if kick_threshold > 0 and user_violations >= kick_threshold and group_config.get("kick_user", False):
-                await self._kick_user(event, group_config.get("is_kick_user_and_block", False))
+                await self._kick_user(audit_data, group_config.get("is_kick_user_and_block", False))
         
         # 检查群组违规次数
         group_violations = self.violation_manager.get_group_violation_count(group_id, time_window)
@@ -405,11 +421,11 @@ class GroupAipReviewPlugin(Star):
         if group_threshold > 0 and group_violations >= group_threshold:
             # 开启全员禁言
             rule_id = group_config.get("rule_id", "default")
-            await self._mute_all_members(event)
+            await self._mute_all_members(audit_data.event)
             
             # 在通知群@全体成员
             notification_msg = f"⚠️ 群内出现大量违规内容\n群ID: {group_id}\n违规次数: {group_violations}次\n已开启全员禁言，请管理员及时处理\n规则ID: {rule_id}"
-            await self._send_notification(group_id, notification_msg)
+            await self._send_notification(group_id, notification_msg, audit_data.group_name, audit_data.user_nickname, audit_data.user_id)
     
     async def _mute_user(self, event: AstrMessageEvent, duration: int):
         """禁言用户"""
@@ -423,22 +439,23 @@ class GroupAipReviewPlugin(Star):
         except Exception as e:
             logger.error(f"禁言用户失败: {e}")
     
-    async def _kick_user(self, event: AstrMessageEvent, block: bool):
+    async def _kick_user(self, audit_data: AuditData, block: bool):
         """踢出用户"""
         try:
-            group_id = event.get_group_id()
-            user_id = event.get_sender_id()
+            group_id = audit_data.group_id
             
-            await event.bot.set_group_kick(
+            await audit_data.event.bot.set_group_kick(
                 group_id=int(group_id),
-                user_id=int(user_id),
+                user_id=int(audit_data.user_id),
                 reject_add_request=block
             )
-            logger.info(f"踢出用户成功: {user_id}, 是否拉黑: {block}")
+            logger.info(f"踢出用户成功: {audit_data.user_id}, 是否拉黑: {block}")
             
-            # 发送通知到通知群
-            notification_msg = f"⚠️ 用户违规踢出通知\n群ID: {group_id}\n用户ID: {user_id}\n已踢出用户，是否拉黑: {'是' if block else '否'}\n请管理员关注"
-            await self._send_notification(group_id, notification_msg)
+            # 发送通知
+            rule_id = self.get_group_config(group_id).get("rule_id", "default")
+            notification_msg = f"⚠️ 用户被踢出群聊\n群ID: {group_id}\n用户ID: {audit_data.user_id}\n是否拉黑: {'是' if block else '否'}\n规则ID: {rule_id}"
+            await self._send_notification(group_id, notification_msg, audit_data.group_name, audit_data.user_nickname, audit_data.user_id)
+            
         except Exception as e:
             logger.error(f"踢出用户失败: {e}")
     
@@ -454,6 +471,7 @@ class GroupAipReviewPlugin(Star):
             logger.error(f"全员禁言失败: {e}")
     
     @filter.event_message_type(filter.EventMessageType.ALL)
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
     async def on_message(self, event: AstrMessageEvent):
         """消息事件监听"""
         # 检查是否为群聊消息
@@ -471,6 +489,15 @@ class GroupAipReviewPlugin(Star):
             logger.warning("百度API未初始化，跳过审核")
             return
         
+        # 获取群名称和用户信息
+        group_name = event.message_obj.raw_message.get("group_name", "未知群") if event.message_obj.raw_message else "未知群"
+        user_nickname = event.message_obj.raw_message.get("sender", {}).get("nickname", "未知用户") if event.message_obj.raw_message and event.message_obj.raw_message.get("sender") else "未知用户"
+        user_id = event.message_obj.raw_message.get("sender", {}).get("user_id", "未知用户号") if event.message_obj.raw_message and event.message_obj.raw_message.get("sender") else "未知用户号"
+        
+        # 调试用
+        logger.info(f"【百度内容审核插件】消息原始字段：{event.message_obj.raw_message}")
+        logger.info(f"【百度内容审核插件】消息类型：{type(event.message_obj.raw_message)}")
+        
         # 提取消息内容
         message_text = event.message_str
         image_urls = []
@@ -482,33 +509,35 @@ class GroupAipReviewPlugin(Star):
         
         # 文本审核
         if self.config.get("enable_text_censor", True) and message_text:
-            await self._audit_text(event, message_text)
+            await self._audit_text(event, message_text, group_name, user_nickname, user_id)
         
         # 图片审核
         if self.config.get("enable_image_censor", True) and image_urls:
             for image_url in image_urls:
-                await self._audit_image(event, image_url)
+                await self._audit_image(event, image_url, group_name, user_nickname, user_id)
     
-    async def _audit_text(self, event: AstrMessageEvent, text: str):
+    async def _audit_text(self, event: AstrMessageEvent, text: str, group_name: str, user_nickname: str, user_id: str):
         """文本审核"""
         try:
             result = await self.baidu_api.text_censor(text)
             audit_result, reason = self.audit_parser.parse_text_result(result)
             
             logger.info(f"文本审核结果: {audit_result} - 原因: {reason}")
-            await self._handle_audit_result(event, "文本", audit_result, reason)
+            audit_data = AuditData(event, "文本", audit_result, reason, group_name, user_nickname, user_id)
+            await self._handle_audit_result(audit_data)
             
         except Exception as e:
             logger.error(f"文本审核异常: {e}")
     
-    async def _audit_image(self, event: AstrMessageEvent, image_url: str):
+    async def _audit_image(self, event: AstrMessageEvent, image_url: str, group_name: str, user_nickname: str, user_id: str):
         """图片审核"""
         try:
             result = await self.baidu_api.image_censor(image_url)
             audit_result, reason = self.audit_parser.parse_image_result(result)
             
             logger.info(f"图片审核结果: {audit_result} - 原因: {reason}")
-            await self._handle_audit_result(event, "图片", audit_result, reason)
+            audit_data = AuditData(event, "图片", audit_result, reason, group_name, user_nickname, user_id)
+            await self._handle_audit_result(audit_data)
             
         except Exception as e:
             logger.error(f"图片审核异常: {e}")
