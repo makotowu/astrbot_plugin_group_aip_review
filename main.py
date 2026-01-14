@@ -289,7 +289,7 @@ class GroupAipReviewPlugin(Star):
                     client = platform.get_client()
                     if hasattr(client, 'send_group_msg'):
                         # 在消息中添加群名称和用户昵称
-                        notification_with_info = f"{message}\n群：{group_name}（{group_id}）\n用户：{user_nickname}（{user_id}）\n规则ID：{rule_id}"
+                        notification_with_info = f"{message}\n群：{group_name}（{group_id}）\n用户：{user_nickname}（{user_id}）"
                         await client.send_group_msg(
                             group_id=int(notify_group_id),
                             message=notification_with_info
