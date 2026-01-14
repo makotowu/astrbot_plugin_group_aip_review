@@ -373,12 +373,12 @@ class GroupAipReviewPlugin(Star):
     
     async def _handle_audit_failure(self, event: AstrMessageEvent, audit_type: str, reason: str, group_config: Dict):
         """处理审核失败"""
-        bot_owner_id = group_config.get("bot_owner_id")
-        if bot_owner_id:
-            # 通知Bot主人
+        admin_id = group_config.get("admin_id")
+        if admin_id:
+            # 通知管理员
             notification_msg = f"⚠️ 审核失败通知\n类型: {audit_type}\n原因: {reason}\n请检查API配置或网络连接"
-            await self._send_private_message(bot_owner_id, notification_msg)
-            logger.warning(f"审核失败，已通知Bot主人: {reason}")
+            await self._send_private_message(admin_id, notification_msg)
+            logger.warning(f"审核失败，已通知管理员: {reason}")
     
     async def _recall_message(self, event: AstrMessageEvent):
         """撤回消息"""

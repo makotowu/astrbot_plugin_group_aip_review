@@ -16,7 +16,7 @@
       "strategy_id": {
         "description": "自定义审核策略ID",
         "type": "string", 
-        "hint": "可选，在百度云后台设置的自定义策略ID"
+        "hint": "可选，在百度云内容审核后台设置的自定义策略ID"
       },
       "access_token_expire": {
         "description": "AccessToken有效期（秒）",
@@ -35,14 +35,14 @@
         "type": "object",
         "items": {
           "notify_group_id": {
-            "description": "默认通知群ID",
+            "description": "默认通知群号",
             "type": "string",
             "hint": "所有未自定义配置的群共用此通知群"
           },
-          "bot_owner_id": {
-            "description": "Bot主人ID",
+          "admin_id": {
+            "description": "管理员账号",
             "type": "string", 
-            "hint": "审核失败时通知Bot主人"
+            "hint": "审核失败时私聊通知管理员账号"
           },
           "single_user_violation_threshold": {
             "description": "单人短时间违规次数阈值",
@@ -103,15 +103,15 @@
                 "hint": "要配置的群号（纯数字）"
               },
               "rule_id": {
-                "description": "规则ID",
+                "description": "审核策略ID",
                 "type": "string",
                 "default": "default",
-                "hint": "规则标识，用于区分不同的审核规则"
+                "hint": "群聊审核策略ID，请在百度云内容审核后台创建并设置规则"
               },
               "notify_group_id": {
-                "description": "通知群ID",
+                "description": "通知群号",
                 "type": "string",
-                "hint": "违规内容通知群ID"
+                "hint": "违规内容通知群号"
               },
               "single_user_violation_threshold": {
                 "description": "单人违规阈值",
@@ -167,15 +167,15 @@
                 "hint": "要配置的群号（纯数字）"
               },
               "rule_id": {
-                "description": "规则ID",
+                "description": "审核策略ID",
                 "type": "string",
-                "default": "strict",
-                "hint": "规则标识，用于区分不同的审核规则"
+                "default": "default",
+                "hint": "群聊审核策略ID，请在百度云内容审核后台创建并设置规则"
               },
               "notify_group_id": {
-                "description": "通知群ID",
+                "description": "通知群号",
                 "type": "string",
-                "hint": "违规内容通知群ID"
+                "hint": "违规内容通知群号"
               },
               "single_user_violation_threshold": {
                 "description": "单人违规阈值",
@@ -231,15 +231,15 @@
                 "hint": "要配置的群号（纯数字）"
               },
               "rule_id": {
-                "description": "规则ID",
+                "description": "审核策略ID",
                 "type": "string",
-                "default": "lenient",
-                "hint": "规则标识，用于区分不同的审核规则"
+                "default": "default",
+                "hint": "群聊审核策略ID，请在百度云内容审核后台创建并设置规则"
               },
               "notify_group_id": {
-                "description": "通知群ID",
+                "description": "通知群号",
                 "type": "string",
-                "hint": "违规内容通知群ID"
+                "hint": "违规内容通知群号"
               },
               "single_user_violation_threshold": {
                 "description": "单人违规阈值",

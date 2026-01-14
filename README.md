@@ -33,7 +33,7 @@
 #### 默认全局配置
 
 - `notify_group_id`：默认通知群ID（所有无自定义的群共用）
-- `bot_owner_id`：Bot主人ID（审核失败时通知）
+- `admin_id`：管理员ID（审核失败时通知）
 - `single_user_violation_threshold`：单人短时间违规次数阈值（默认3次，设置为0表示不启用单人禁言功能）
 - `group_violation_threshold`：群内短时间违规次数阈值（默认5次，设置为0表示不启用全员禁言功能）
 - `time_window`：统计时间窗口（秒，默认300秒=5分钟）
